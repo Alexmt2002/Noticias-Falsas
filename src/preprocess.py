@@ -23,7 +23,6 @@ df = pd.read_csv(ruta)
 
 print(f"EL nombre de las columnas son: \n {df.columns}")
 df = df.drop(columns=['Unnamed: 0'])
-print("--------------")
 
 
 def limpiar_texto(texto):
@@ -53,23 +52,21 @@ def limpiar_texto(texto):
 
 
 def limpiar_dataset(dataset):
+    # 1. Eliminar nulos iniciales y duplicados
+    dataset = dataset.dropna().drop_duplicates().copy()
 
-    # eliminar filas vacías
-    dataset_limpio = dataset.dropna().copy()
-
-    # eliminar nulos
-    dataset_limpio = dataset.dropna()
-
-    # eliminar duplicados
-    dataset_limpio = dataset_limpio.drop_duplicates()
-
-    # limpiar columnas de texto
     columnas_texto = ["title", "text"]
-
     for col in columnas_texto:
-        dataset_limpio[col] = dataset_limpio[col].apply(limpiar_texto)
+        dataset[col] = dataset[col].apply(limpiar_texto)
 
-    return dataset_limpio
+    # 2. Reemplazar strings vacíos (que dejó la limpieza) por NaN
+    import numpy as np
+    dataset.replace("", np.nan, inplace=True)
+    
+    # 3. Eliminar ahora los nuevos nulos creados
+    dataset = dataset.dropna(subset=columnas_texto)
+
+    return dataset
 
 def guardar_dataset(dataset):
 
@@ -88,5 +85,7 @@ dataset_limpio = limpiar_dataset(df)
 guardar_dataset(dataset_limpio)
 
 print(dataset_limpio.head())
+
+
 
 
