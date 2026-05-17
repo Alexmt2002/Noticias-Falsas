@@ -2,52 +2,116 @@ import os
 import joblib
 
 from preprocess import limpiar_texto
+from deep_translator import GoogleTranslator
 
 
 # =========================
 # CARGAR MODELO Y TF-IDF
 # =========================
 
+BASE_DIR = os.path.dirname(__file__)
+
 ruta_modelo = os.path.join(
-    os.path.dirname(__file__),
+    BASE_DIR,
     "model",
     "modelo_logreg.pkl"
 )
 
 ruta_vectorizer = os.path.join(
-    os.path.dirname(__file__),
+    BASE_DIR,
     "model",
     "vectorizador_logreg.pkl"
 )
 
+print("Cargando modelo...")
 modelo = joblib.load(ruta_modelo)
 vectorizer = joblib.load(ruta_vectorizer)
+print("Modelo cargado correctamente")
 
 
 
 def predecir_noticia(texto):
 
-    # limpiar texto
-    texto_limpio = limpiar_texto(texto)
+    # Validar entrada
+    if not texto or not texto.strip():
 
-    # convertir a vector TF-IDF
-    vector = vectorizer.transform([texto_limpio])
+        return "ERROR: Debes introducir texto."
 
-    # hacer predicción
-    prediccion = modelo.predict(vector)
+    try:
 
-    # convertir resultado a texto
-    if prediccion[0] == 1:
-        return "FAKE NEWS"
-    else:
-        return "REAL NEWS"
+        # traducir automáticamente a inglés
+        texto_traducido = GoogleTranslator(
+            source='auto',
+            target='en'
+        ).translate(texto)
 
+        # limpiar texto
+        texto_limpio = limpiar_texto(
+            texto_traducido
+        )
 
+        # convertir a vector
+        vector = vectorizer.transform(
+            [texto_limpio]
+        )
+
+        # predicción
+        prediccion = modelo.predict(vector)[0]
+
+        # probabilidades
+        probabilidades = modelo.predict_proba(
+            vector
+        )[0]
+
+        confianza_real = probabilidades[0] * 100
+
+        confianza_fake = probabilidades[1] * 100
+
+        # resultado final
+        if prediccion == 1:
+
+            return (
+                f"\nFAKE NEWS\n"
+                f"Confianza: {confianza_fake:.2f}%"
+            )
+
+        else:
+
+            return (
+                f"\nREAL NEWS\n"
+                f"Confianza: {confianza_real:.2f}%"
+            )
+
+    except Exception as e:
+
+        return f"ERROR: {str(e)}"
 if __name__ == "__main__":
 
-    noticia = input("Introduce una noticia: ")
+    while True:
 
-    resultado = predecir_noticia(noticia)
+        print("\n========================")
+        print(" DETECTOR DE FAKE NEWS ")
+        print("========================")
 
-    print("\nResultado:")
-    print(resultado)
+        noticia = input(
+            "\nIntroduce una noticia:\n\n> "
+        )
+
+        if noticia.lower() == "salir":
+
+            print("\nCerrando programa...")
+
+            break
+
+        resultado = predecir_noticia(
+            noticia
+        )
+
+        print("\n========================")
+        print(" RESULTADO ")
+        print("========================")
+
+        print(resultado)
+
+        
+

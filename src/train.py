@@ -3,9 +3,16 @@ import joblib
 import pandas as pd
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report
+
 from sklearn.model_selection import train_test_split
+
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix
+)
 
 
 # =========================
@@ -19,8 +26,13 @@ ruta = os.path.join(
     "dataset_limpio.csv"
 )
 
-df = pd.read_csv(ruta)
+df = pd.read_csv(
+    ruta,
+    encoding="utf-8"
+)
 
+print("\nDistribución de clases:")
+print(df["label"].value_counts())
 
 # =========================
 # PREPROCESAMIENTO
@@ -40,7 +52,8 @@ X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
     test_size=0.2,
-    random_state=42
+    random_state=42,
+    stratify=y
 )
 
 
@@ -48,7 +61,13 @@ X_train, X_test, y_train, y_test = train_test_split(
 # VECTORIZACIÓN TF-IDF
 # =========================
 
-vectorizer = TfidfVectorizer()
+vectorizer = TfidfVectorizer(
+    max_features=50000,
+    ngram_range=(1,2),
+    min_df=2,
+    max_df=0.95,
+    sublinear_tf=True
+)
 
 X_train_tfidf = vectorizer.fit_transform(X_train)
 X_test_tfidf = vectorizer.transform(X_test)
@@ -58,7 +77,11 @@ X_test_tfidf = vectorizer.transform(X_test)
 # ENTRENAMIENTO DEL MODELO
 # =========================
 
-modelo = LogisticRegression()
+modelo = LogisticRegression(
+    max_iter=2000,
+    class_weight="balanced",
+    random_state=42
+)
 
 modelo.fit(X_train_tfidf, y_train)
 
@@ -69,10 +92,34 @@ modelo.fit(X_train_tfidf, y_train)
 
 predicciones = modelo.predict(X_test_tfidf)
 
-accuracy = accuracy_score(y_test, predicciones)
+probabilidades = modelo.predict_proba(
+    X_test_tfidf
+)
 
-print(f"Accuracy: {accuracy}")
-print(classification_report(y_test, predicciones))
+accuracy = accuracy_score(
+    y_test,
+    predicciones
+)
+
+print(f"\nAccuracy: {accuracy:.4f}")
+
+print("\nClassification Report:\n")
+
+print(
+    classification_report(
+        y_test,
+        predicciones
+    )
+)
+
+print("\nConfusion Matrix:\n")
+
+print(
+    confusion_matrix(
+        y_test,
+        predicciones
+    )
+)
 
 
 # =========================
@@ -93,10 +140,33 @@ os.makedirs(ruta_model, exist_ok=True)
 
 joblib.dump(
     modelo,
-    os.path.join(ruta_model, "modelo_logreg.pkl")
+    os.path.join(
+        ruta_model,
+        "modelo_logreg.pkl"
+    ),
+    compress=3
 )
 
 joblib.dump(
     vectorizer,
-    os.path.join(ruta_model, "vectorizador_logreg.pkl")
+    os.path.join(
+        ruta_model,
+        "vectorizador_logreg.pkl"
+    ),
+    compress=3
 )
+
+feature_names = vectorizer.get_feature_names_out()
+coeficientes = modelo.coef_[0]
+top_fake = coeficientes.argsort()[-20:]
+top_real = coeficientes.argsort()[:20]
+
+print("\nPalabras más asociadas a FAKE NEWS:\n")
+
+for i in reversed(top_fake):
+    print(feature_names[i])
+
+print("\nPalabras más asociadas a REAL NEWS:\n")
+
+for i in top_real:
+    print(feature_names[i])
