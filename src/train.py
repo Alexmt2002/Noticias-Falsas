@@ -2,79 +2,100 @@ import os
 import joblib
 import pandas as pd
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sentence_transformers import SentenceTransformer
 
 from sklearn.linear_model import LogisticRegression
 
 from sklearn.model_selection import train_test_split
 
 from sklearn.metrics import (
-    accuracy_score,
     classification_report,
-    confusion_matrix
+    accuracy_score
+)
+
+from preprocess import limpiar_texto
+
+from config import (
+    DATASET_PATH,
+    MODEL_NAME
 )
 
 
 # =========================
-# CARGA DEL DATASET
+# CARGAR DATASET
 # =========================
 
-ruta = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "data",
-    "dataset_limpio.csv"
+df = pd.read_csv(DATASET_PATH)
+
+df = df.dropna()
+
+df["title"] = df["title"].astype(str)
+df["text"] = df["text"].astype(str)
+
+
+# =========================
+# CREAR CONTENIDO
+# =========================
+
+df["content"] = (
+    df["title"] + " " + df["text"]
 )
 
-df = pd.read_csv(
-    ruta,
-    encoding="utf-8"
+# limpiar texto
+df["content"] = df["content"].apply(
+    limpiar_texto
 )
 
-print("\nDistribución de clases:")
-print(df["label"].value_counts())
 
 # =========================
-# PREPROCESAMIENTO
-# =========================
-
-df["content"] = df["title"] + " " + df["text"]
-
-X = df["content"]
-y = df["label"]
-
-
-# =========================
-# DIVISIÓN DE DATOS
+# TRAIN / TEST
 # =========================
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
+    df["content"],
+    df["label"],
     test_size=0.2,
     random_state=42,
-    stratify=y
+    stratify=df["label"]
 )
 
 
 # =========================
-# VECTORIZACIÓN TF-IDF
+# MODELO DE EMBEDDINGS
 # =========================
 
-vectorizer = TfidfVectorizer(
-    max_features=50000,
-    ngram_range=(1,2),
-    min_df=2,
-    max_df=0.95,
-    sublinear_tf=True
+print("Cargando modelo NLP...")
+
+modelo_embedding = SentenceTransformer(
+    MODEL_NAME
 )
 
-X_train_tfidf = vectorizer.fit_transform(X_train)
-X_test_tfidf = vectorizer.transform(X_test)
+
+# =========================
+# GENERAR EMBEDDINGS
+# =========================
+
+print("Generando embeddings train...")
+
+X_train_embeddings = modelo_embedding.encode(
+    X_train.tolist(),
+    batch_size=32,
+    show_progress_bar=True,
+    normalize_embeddings=True
+)
+
+print("Generando embeddings test...")
+
+X_test_embeddings = modelo_embedding.encode(
+    X_test.tolist(),
+    batch_size=32,
+    show_progress_bar=True,
+    normalize_embeddings=True
+)
 
 
 # =========================
-# ENTRENAMIENTO DEL MODELO
+# ENTRENAR MODELO
 # =========================
 
 modelo = LogisticRegression(
@@ -83,17 +104,18 @@ modelo = LogisticRegression(
     random_state=42
 )
 
-modelo.fit(X_train_tfidf, y_train)
+modelo.fit(
+    X_train_embeddings,
+    y_train
+)
 
 
 # =========================
-# PREDICCIONES Y MÉTRICAS
+# PREDICCIONES
 # =========================
 
-predicciones = modelo.predict(X_test_tfidf)
-
-probabilidades = modelo.predict_proba(
-    X_test_tfidf
+predicciones = modelo.predict(
+    X_test_embeddings
 )
 
 accuracy = accuracy_score(
@@ -101,9 +123,7 @@ accuracy = accuracy_score(
     predicciones
 )
 
-print(f"\nAccuracy: {accuracy:.4f}")
-
-print("\nClassification Report:\n")
+print(f"\nAccuracy: {accuracy:.4f}\n")
 
 print(
     classification_report(
@@ -112,61 +132,37 @@ print(
     )
 )
 
-print("\nConfusion Matrix:\n")
 
-print(
-    confusion_matrix(
-        y_test,
-        predicciones
+# =========================
+# GUARDAR MÉTRICAS
+# =========================
+
+os.makedirs("model", exist_ok=True)
+
+with open("model/metricas.txt", "w") as f:
+
+    f.write(f"Accuracy: {accuracy:.4f}\n\n")
+
+    f.write(
+        classification_report(
+            y_test,
+            predicciones
+        )
     )
-)
 
 
 # =========================
-# CREAR RUTA DE MODELOS
-# =========================
-
-ruta_model = os.path.join(
-    os.path.dirname(__file__),
-    "model"
-)
-
-os.makedirs(ruta_model, exist_ok=True)
-
-
-# =========================
-# GUARDAR MODELO Y VECTORIZADOR
+# GUARDAR MODELOS
 # =========================
 
 joblib.dump(
     modelo,
-    os.path.join(
-        ruta_model,
-        "modelo_logreg.pkl"
-    ),
-    compress=3
+    "model/modelo_fake_news.pkl"
 )
 
 joblib.dump(
-    vectorizer,
-    os.path.join(
-        ruta_model,
-        "vectorizador_logreg.pkl"
-    ),
-    compress=3
+    modelo_embedding,
+    "model/modelo_embeddings.pkl"
 )
 
-feature_names = vectorizer.get_feature_names_out()
-coeficientes = modelo.coef_[0]
-top_fake = coeficientes.argsort()[-20:]
-top_real = coeficientes.argsort()[:20]
-
-print("\nPalabras más asociadas a FAKE NEWS:\n")
-
-for i in reversed(top_fake):
-    print(feature_names[i])
-
-print("\nPalabras más asociadas a REAL NEWS:\n")
-
-for i in top_real:
-    print(feature_names[i])
+print("\nModelos guardados correctamente")

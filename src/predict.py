@@ -1,90 +1,106 @@
-import os
 import joblib
 
-from preprocess import limpiar_texto
 from deep_translator import GoogleTranslator
 
+from src.preprocess import limpiar_texto
+
 
 # =========================
-# CARGAR MODELO Y TF-IDF
+# CARGAR MODELOS
 # =========================
 
-BASE_DIR = os.path.dirname(__file__)
+print("Cargando modelos...")
 
-ruta_modelo = os.path.join(
-    BASE_DIR,
-    "model",
-    "modelo_logreg.pkl"
+modelo = joblib.load(
+    "model/modelo_fake_news.pkl"
 )
 
-ruta_vectorizer = os.path.join(
-    BASE_DIR,
-    "model",
-    "vectorizador_logreg.pkl"
+modelo_embedding = joblib.load(
+    "model/modelo_embeddings.pkl"
 )
 
-print("Cargando modelo...")
-modelo = joblib.load(ruta_modelo)
-vectorizer = joblib.load(ruta_vectorizer)
-print("Modelo cargado correctamente")
+print("Modelos cargados correctamente")
 
 
+# comprobar clases
+print("\nClases del modelo:")
+print(modelo.classes_)
+
+
+# =========================
+# FUNCIÓN PRINCIPAL
+# =========================
 
 def predecir_noticia(texto):
 
-    # Validar entrada
+    # validar texto
     if not texto or not texto.strip():
 
         return "ERROR: Debes introducir texto."
 
     try:
 
-        # traducir automáticamente a inglés
-        texto_traducido = GoogleTranslator(
-            source='auto',
-            target='en'
-        ).translate(texto)
+        # traducir a inglés
+        try:
+
+            texto_traducido = GoogleTranslator(
+                source="auto",
+                target="en"
+            ).translate(texto)
+
+        except:
+
+            texto_traducido = texto
 
         # limpiar texto
         texto_limpio = limpiar_texto(
             texto_traducido
         )
 
-        # convertir a vector
-        vector = vectorizer.transform(
-            [texto_limpio]
+        # generar embedding
+        embedding = modelo_embedding.encode(
+            [texto_limpio],
+            normalize_embeddings=True
         )
 
         # predicción
-        prediccion = modelo.predict(vector)[0]
+        prediccion = modelo.predict(
+            embedding
+        )[0]
 
         # probabilidades
         probabilidades = modelo.predict_proba(
-            vector
+            embedding
         )[0]
 
-        confianza_real = probabilidades[0] * 100
-
-        confianza_fake = probabilidades[1] * 100
-
-        # resultado final
+        # resultado
         if prediccion == 1:
+
+            confianza = probabilidades[1] * 100
 
             return (
                 f"\nFAKE NEWS\n"
-                f"Confianza: {confianza_fake:.2f}%"
+                f"Confianza: {confianza:.2f}%"
             )
 
         else:
 
+            confianza = probabilidades[0] * 100
+
             return (
                 f"\nREAL NEWS\n"
-                f"Confianza: {confianza_real:.2f}%"
+                f"Confianza: {confianza:.2f}%"
             )
 
     except Exception as e:
 
         return f"ERROR: {str(e)}"
+
+
+# =========================
+# CONSOLA
+# =========================
+
 if __name__ == "__main__":
 
     while True:
@@ -100,7 +116,6 @@ if __name__ == "__main__":
         if noticia.lower() == "salir":
 
             print("\nCerrando programa...")
-
             break
 
         resultado = predecir_noticia(
@@ -112,6 +127,3 @@ if __name__ == "__main__":
         print("========================")
 
         print(resultado)
-
-        
-

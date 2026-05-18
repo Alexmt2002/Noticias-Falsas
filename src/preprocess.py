@@ -22,48 +22,40 @@ stop_words_es = set(stopwords.words('spanish'))
 
 stop_words = stop_words_en.union(stop_words_es)
 
-# Pone las palabras en su forma base
-lemmatizer = WordNetLemmatizer()
+
 
 def limpiar_texto(texto):
 
-    # evitar errores
     if not isinstance(texto, str):
         return ""
 
-    # minúsculas
     texto = texto.lower()
 
-    # eliminar urls
-    texto = re.sub(r"http\S+|www\S+", "", texto)
+    texto = re.sub(
+        r"http\S+|www\S+",
+        "",
+        texto
+    )
 
-    # eliminar html
-    texto = re.sub(r"<.*?>", "", texto)
+    texto = re.sub(
+        r"<.*?>",
+        "",
+        texto
+    )
 
-    # conservar letras y números
-    texto = re.sub(r"[^\w\s]", "", texto)
+    texto = re.sub(
+        r"[^\w\s]",
+        "",
+        texto
+    )
 
-    # tokenizar
-    tokens = word_tokenize(texto)
-
-    # eliminar stopwords
-    tokens = [
-        palabra
-        for palabra in tokens
-        if palabra not in stop_words
-    ]
-
-    # lematizar
-    tokens = [
-        lemmatizer.lemmatize(palabra)
-        for palabra in tokens
-    ]
-
-    # unir texto
-    texto = " ".join(tokens)
+    texto = re.sub(
+        r"\s+",
+        " ",
+        texto
+    ).strip()
 
     return texto
-
 
 def limpiar_dataset(dataset):
 
