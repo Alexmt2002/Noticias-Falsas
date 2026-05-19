@@ -11,8 +11,15 @@ from fact_check import verificar_wikipedia
 
 from similarity import calcular_similitud
 
+from entity_extractor import (
+    extraer_entidades
+)
+from entity_matcher import (
+    comparar_entidades
+)
 
-
+def construir_query(entidades):
+    return " ".join([e["texto"] for e in entidades[:3]])
 
 # =========================
 # CARGAR MODELOS
@@ -51,6 +58,9 @@ def predecir_noticia(texto):
 
         # traducir a inglés
         try:
+            query = ""
+            entidades_usuario = []
+            evidencia = ""
 
             tema, confianza_tema = clasificar_tema(
                 texto
@@ -71,15 +81,43 @@ def predecir_noticia(texto):
         texto_limpio = limpiar_texto(
             texto_traducido
         )
-        evidencia = verificar_wikipedia(
-            texto_traducido
+        # entidades usuario
+        entidades_usuario = (
+            extraer_entidades(
+                texto_traducido
+            )
         )
+        print("\nDEBUG QUERY WIKIPEDIA:")
+        print(query)
+
+        print("\nEntidades usuario:")
+
+        print(entidades_usuario)
+        entidades_usuario = extraer_entidades(texto_traducido)
+
+        query = construir_query(entidades_usuario)
+
+        evidencia = verificar_wikipedia(query)
 
         if evidencia:
 
             print("\nEvidencia encontrada:")
 
             print(evidencia[:300])
+        
+        entidades_wiki = []
+
+        if evidencia:
+
+            entidades_wiki = (
+                extraer_entidades(
+                    evidencia
+                )
+            )
+
+        print("\nEntidades Wikipedia:")
+
+        print(entidades_wiki)
         
         # calcular similitud
         similitud = calcular_similitud(
@@ -90,6 +128,17 @@ def predecir_noticia(texto):
         print(
             f"\nSimilitud semántica: "
             f"{similitud}%"
+        )
+
+        # comparar entidades
+        score_entidades = comparar_entidades(
+            entidades_usuario,
+            entidades_wiki
+        )
+
+        print(
+            f"\nScore entidades: "
+            f"{score_entidades}"
         )
 
         # generar embedding
@@ -120,10 +169,18 @@ def predecir_noticia(texto):
 
 
         # score híbrido
+        # score híbrido inicial
         score_final = (
-            (confianza_nlp * 0.6) +
-            (similitud * 0.4)
+            (confianza_nlp * 0.4) +
+            (similitud * 0.2)
         )
+
+        # penalización fuerte por contradicción factual
+        if score_entidades < 0:
+            score_final -= 20
+
+        # ajuste por coincidencias de entidades
+        score_final += score_entidades * 3
 
 
         # decisión final
