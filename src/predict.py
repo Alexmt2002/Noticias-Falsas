@@ -1,8 +1,17 @@
+from IPython import terminal
+from IPython import terminal
+from IPython import terminal
 import joblib
 
 from deep_translator import GoogleTranslator
+from preprocess import limpiar_texto
 
-from src.preprocess import limpiar_texto
+from classify_topic import clasificar_tema
+from fact_check import verificar_wikipedia
+
+from similarity import calcular_similitud
+
+
 
 
 # =========================
@@ -43,6 +52,12 @@ def predecir_noticia(texto):
         # traducir a inglés
         try:
 
+            tema, confianza_tema = clasificar_tema(
+                texto
+            )
+
+            print(f"\nTema detectado: {tema}")
+
             texto_traducido = GoogleTranslator(
                 source="auto",
                 target="en"
@@ -55,6 +70,26 @@ def predecir_noticia(texto):
         # limpiar texto
         texto_limpio = limpiar_texto(
             texto_traducido
+        )
+        evidencia = verificar_wikipedia(
+            texto_traducido
+        )
+
+        if evidencia:
+
+            print("\nEvidencia encontrada:")
+
+            print(evidencia[:300])
+        
+        # calcular similitud
+        similitud = calcular_similitud(
+            texto_traducido,
+            evidencia
+        )
+
+        print(
+            f"\nSimilitud semántica: "
+            f"{similitud}%"
         )
 
         # generar embedding
@@ -74,24 +109,39 @@ def predecir_noticia(texto):
         )[0]
 
         # resultado
+        # score NLP
         if prediccion == 1:
 
-            confianza = probabilidades[1] * 100
-
-            return (
-                f"\nFAKE NEWS\n"
-                f"Confianza: {confianza:.2f}%"
-            )
+            confianza_nlp = probabilidades[1] * 100
 
         else:
 
-            confianza = probabilidades[0] * 100
+            confianza_nlp = probabilidades[0] * 100
 
-            return (
-                f"\nREAL NEWS\n"
-                f"Confianza: {confianza:.2f}%"
-            )
 
+        # score híbrido
+        score_final = (
+            (confianza_nlp * 0.6) +
+            (similitud * 0.4)
+        )
+
+
+        # decisión final
+        if score_final >= 60:
+
+            resultado_final = "REAL NEWS"
+
+        else:
+
+            resultado_final = "FAKE NEWS"
+
+
+        return (
+            f"\n{resultado_final}\n"
+            f"Score final: {score_final:.2f}%\n"
+            f"Tema: {tema}\n"
+            f"Similitud: {similitud}%"
+        )
     except Exception as e:
 
         return f"ERROR: {str(e)}"

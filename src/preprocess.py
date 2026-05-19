@@ -61,7 +61,7 @@ def limpiar_dataset(dataset):
 
     dataset = dataset.dropna().drop_duplicates().copy()
 
-    columnas_texto = ["title", "text"]
+    columnas_texto = ["title", "full_text"] #Importante dependiendo del dataset
 
     for col in columnas_texto:
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         os.path.dirname(__file__),
         "..",
         "data",
-        "WELFake_Dataset.csv"
+        "GlobalFakeNews_Research2026_v1.csv"
     )
 
     df = pd.read_csv(ruta)

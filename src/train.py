@@ -30,7 +30,7 @@ df = pd.read_csv(DATASET_PATH)
 df = df.dropna()
 
 df["title"] = df["title"].astype(str)
-df["text"] = df["text"].astype(str)
+df["full_text"] = df["full_text"].astype(str)
 
 
 # =========================
@@ -38,7 +38,7 @@ df["text"] = df["text"].astype(str)
 # =========================
 
 df["content"] = (
-    df["title"] + " " + df["text"]
+    df["title"] + " " + df["full_text"]
 )
 
 # limpiar texto

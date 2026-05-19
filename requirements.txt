@@ -8,3 +8,4 @@ torch
 transformers
 deep-translator
 streamlit
+wikipedia
